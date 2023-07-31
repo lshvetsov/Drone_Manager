@@ -1,92 +1,231 @@
-# DEV_DRONES
+# Requirements
 
+## Functional
 
+**Initial**
 
-## Getting started
+| REQ |                                     Requirement                                     |                                      Notes                                      |
+|:---:|:-----------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------:|
+|  1  |                              I can registering a drone                              | We have a fleet of 10 drones but we can add more drones, starting status - IDLE |
+|  2  |                      I can load a drone with medication items                       |       Status LOADING in the beginning, LOADED at the end of the operation       |
+|  3  |                I can check loaded medication items for a given drone                |                                        -                                        |
+|  4  |                     I can checking available drones for loading                     |                               In the IDLE status                                |
+|  5  |                  I can check drone battery level for a given drone                  |                              Identifications by id                              |
+|  6  |       Prevent the drone from being loaded with more weight that it can carry        |                         Validation for the UC **REQ2**                          |
+|  7  | Prevent the drone from being in LOADING state if the battery level is **below 25%** |                         Validation for the UC **REQ2**                          |
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+**Missed requirements/assumptions**
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+|  #  |                                             Requirement                                              |                                                    Notes                                                     |
+|:---:|:----------------------------------------------------------------------------------------------------:|:------------------------------------------------------------------------------------------------------------:|
+|  8  |                              I need to launch a drone when it's loaded                               |                                    The drone status: LOADED -> DELIVERING                                    |
+|  9  |                             I need to be able to receive the drone back                              |                        The drone status: DELIVERING -> IDLE (later RETURNING -> IDLE)                        |
+| 10  |        During a flight the drone's status should be changed depending on the delivery status         |               Look at the status table below, *assumption* - out of the current project scope                |
+| 11  |                    A drone's battery level should decreased while it in delivery                     |                   Scheduled task for drones on mission - DELIVERING, DELIVERED, RETURNING                    |
+| 12  | A drone's should control its charge and stop the mission at the minimum charge needed to return back |                               *Assumption* - out of the current project scope                                |
+| 13  |                         We need to audit changes in the drone's change level                         |             For now - just console output: *"Current change level of drone {id} is {percent}%%"*             |
+| 14  |                     We need to keep track of what medicines have been delivered                      | We introduce the new entity *ORDER* which matches medicines and drones, *restrictions* - one drone per order |
 
-## Add your files
+### Status model
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+```plantuml
+@startuml
+IDLE: the drone is at the base
+LOADING: the drone is in the loading process
+LOADED: the drone is ready to be launched
+DELIVERING: the drone is on a mission, and the package hasn't been delivered
+DELIVERED: the drone is on a mission, and the package has been delivered
+RETURNING: the drone is on a mission returning back. 
 
+[*] --> IDLE
+IDLE -down-> LOADING: loading process started
+LOADING -up-> IDLE  
+LOADING -down-> LOADED: loading process finished
+LOADED -up-> LOADING
+LOADED -down-> DELIVERING: drone is launched
+DELIVERING -down-> DELIVERED: order is delivered
+DELIVERING -down-> RETURNING: drone is returning without delivering
+DELIVERED -down-> RETURNING: drone is returning after the delivery
+RETURNING -up-> IDLE: drone has returned
+@enduml
 ```
-cd existing_repo
-git remote add origin https://gitlab.musala.com/hr/practical-tasks-group/DEV_DRONES.git
-git branch -M main
-git push -uf origin main
+![Status_model](/docs/status_model.png)
+
+## Non-functional*
+
+- [*] Input/output data must be in JSON format;
+- [*] Your project must be buildable and runnable;
+- [*] Your project must have a README file with build/run/test instructions (use DB that can be run locally, e.g. in-memory, via container);
+- [*] Any data required by the application to run (e.g. reference tables, dummy data) must be preloaded in the database;
+- [*] Unit tests;
+- [*] Use a framework of your choice, but popular, up-to-date, and long-term support versions are recommended.
+
+## Backlog
+- add dto level and its own validation
+- add the number to the medicines in the order
+- integration test
+- delete medication | order
+
+- replace real deletion with changing status
+- add schema initialization script or migration tool (liquibase | flyway)
+
+## Out of scope
+
+1) At this stage, we don't consider interaction with drone while they are on mission so the drone status is managed manually (it's a black box from the moment we launch the drone to the moment it returns).
+
+# Architecture
+
+**Technology**
+- Java 17
+- Spring boot 3.1.2
+- Local H2 DB
+
+**Prerequisites**
+- We don't have any requirements for performance and data durability so for the MVP purpose we are going to use embedded H2 DB.
+- We don't implement real communication with drones so for now we just run a job to update a charge level of drones. 
+    
+**Current architecture**
+```plantuml
+@startuml
+package "Application" {
+  API- [MainComponent]
+  [ChargeUpdateJob]
+}
+
+database "H2" {
+   [DB]
+}
+
+
+[MainComponent] --> [DB]
+[ChargeUpdateJob] --> [DB]
+@enduml
 ```
+![Current architecture](/docs/current_architecture.png)
 
-## Integrate with your tools
+**Target architecture (draft)**
 
-- [ ] [Set up project integrations](https://gitlab.musala.com/hr/practical-tasks-group/DEV_DRONES/-/settings/integrations)
+```plantuml
+@startuml
+skinparam linetype ortho
 
-## Collaborate with your team
+package "Application" {
+  [DroneManagementModule]
+  [DroneMessageProcessor]
+  [OrderManagementModule]
+  [FleetManagementModule]
+  [DrugManagementModule]
+}
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+cloud "Drone" {
+  [DroneSoftware]
+}
 
-## Test and Deploy
+cloud "Users" {
+  [DroneOperator]
+}
 
-Use the built-in continuous integration in GitLab.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+database "DataBase" {
+   [DrugDB]
+   [FleetDB]
+   [OrderDB]
+}
 
-***
+database "In memory" {
+   [IMDB]
+}
 
-# Editing this README
+database "Queue" {
+   [Kafka]
+}
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+[DroneOperator] --> [OrderManagementModule]: 1
+[DroneOperator] --> [FleetManagementModule]: 2
+[DroneOperator]--> [DrugManagementModule]: 3
+[OrderManagementModule] --> [OrderDB]
+[FleetManagementModule] --> [FleetDB]
+[DrugManagementModule] --> [DrugDB]
+[OrderManagementModule] --> [DroneManagementModule]: 4
+[DroneSoftware] ..> [Kafka]: 5
+[DroneMessageProcessor]..>[Kafka]: 6
+[DroneMessageProcessor] --> [IMDB]: 6
+[DroneManagementModule] --> [IMDB]
+[DroneManagementModule] ..> [DroneSoftware]: 7
+@enduml
+```
+![Draft of the target architecture](/docs/target_architecture.png)
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+1) We are going to separate interfaces for users (operators) and drones.
+2) The DB is responsible for order and fleet management whereas the IMDB is responsible for data from drones (charge level, GPS coordinates, etc).
+3) Modules: 
+  - DroneManagementModule - manage communication with drones (calculate when to return, send commands) -> probably later will be split into several modules (commands, video processing, navigation, etc)
+  - DroneMessageProcessor - process heartbeat messages from drones (state: charge level, GPS coordinates, etc)
+  - OrderManagementModule - manage orders (load and launch drones)
+  - FleetManagementModule - manage the drone fleet (add, remove, replace, change metadata, get idle etc)
+  - DrugManagementModule - manage medicines
+4) API and operations
+   - (1) sync order management
+   - (2) sync fleet management 
+   - (3) sync drug management
+   - (4) notification on the drone launch
+   - (5) drones heartbeats
+   - (6) async processing heartbeat messages from drones (update IMDB)
+   - (7) commands to drones
 
-## Name
-Choose a self-explaining name for your project.
+# DB
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```plantuml
+@startuml
+' hide the spot
+' hide circle
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+' avoid problems with angled crows feet
+skinparam linetype ortho
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+entity "Drone" as drone {
+  *serial_number : number (100 character max)
+  --
+  *model: text (enum)
+  *weight_limit: number (0 - 500)
+  *battery_capacity (0-100)
+  *state: text (enum)
+}
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+entity "Medication" as medication{
+  *id : number <<generated>>
+  --
+  *name: text
+  *weight: number
+  *code: text
+  image: text (URL)
+}
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+entity "Order" as order {
+  *order_id: number <<generated>>
+  --
+  *drone_id: number <<FK>>
+  *state: text (enum)
+  *customer_name
+}
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+drone ||..|| order
+medication }|..|| order_medicine
+order }|..|| order_medicine
+@enduml
+```
+![DB](/docs/DB.png)
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+# API
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Open API documentation are available at: ```localhost:{{port}}/swagger-ui/index.html``` 
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+# Build & Run
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+1) After the first application run, it need to set ```spring.jpa.hibernate.ddl-auto=valuate``` in ```application.yml```. 
+2) Run ```mvn package```
+3) Run ```java -jar .\DEV_DRONES-373200e7-c296-004f-96a9-410418c98c47\target\DroneManager-0.0.2-SNAPSHOT.jar```.                  
 
-## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+

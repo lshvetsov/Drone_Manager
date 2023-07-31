@@ -1,0 +1,52 @@
+### Drones
+POST http://localhost:8085/drones
+Accept: application/json
+Content-Type: application/json
+
+{
+  "serialNumber": "SN50034345{{$random.integer()}}",
+  "model": "LIGHTWEIGHT",
+  "weightLimit": 300,
+  "batteryCapacity": 120
+}
+
+###
+GET http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46
+
+###
+GET http://localhost:8085/drones
+
+### Drone - check availability
+GET http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46/available
+
+### Drone - Get the battery level
+GET http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46/battery
+
+###
+PUT http://localhost:8085/drones
+Accept: application/json
+Content-Type: application/json
+
+{
+  "id": "d40aad80-b87a-4424-9dcf-f0748d553a46",
+  "serialNumber": "d027jm",
+  "model": "LIGHTWEIGHT",
+  "weightLimit": 90,
+  "batteryCapacity": 100
+}
+
+###
+DELETE http://localhost:8085/drones/7bedc1c2-55ec-478f-8d39-1afd52106465
+
+
+### Medications
+GET http://localhost:8085/medication/KR60
+
+###
+POST http://localhost:8085/medication/list
+Content-Type: application/json
+
+["h09p4Ng", "KR60", "1r6IR"]
+
+###
+GET http://localhost:8085/medication/weight-less-than/30

@@ -1,0 +1,51 @@
+### 1. Get medicines
+POST http://localhost:8085/medication/list
+Content-Type: application/json
+
+["h09p4Ng", "KR60", "1r6IR"]
+
+### 2. Load drone
+POST http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46/load
+Content-Type: application/json
+
+[
+  {
+    "id": "3907fed0-b6e4-4b2d-9b92-14d82925fd46",
+    "name": "into",
+    "weight": 30.00,
+    "code": "h09p4Ng",
+    "image": null
+  },
+  {
+    "id": "4fd9d1f0-c228-4ea7-b8e4-bc8375c5fb96",
+    "name": "short",
+    "weight": 50.00,
+    "code": "KR60",
+    "image": null
+  }
+]
+
+###
+GET http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46/medications
+
+### 3. Launch drone
+
+POST http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46/launch
+
+> {%
+    const someId =  response.body;
+    client.global.set("orderId", response.body);
+%}
+
+### 4. Check the drone state
+GET http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46
+### Availability
+GET http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46/available
+### Battery level
+GET http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46/battery
+
+### 5.1. Alternative: Receive the drone (the order has been delivered)
+POST http://localhost:8085/drones/d40aad80-b87a-4424-9dcf-f0748d553a46/receive
+
+### 5.2. Alternarive: Cancel the order (a customer has cancelled the order)
+POST http://localhost:8085/medications/{{orderId}}
